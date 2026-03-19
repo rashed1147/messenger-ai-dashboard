@@ -1,24 +1,19 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
-// ⬇️ এখানে তোমার Google Apps Script deploy URL দাও
-const API_URL = "https://script.google.com/macros/s/AKfycbx3lOwmMW3Xz40LroT0lLJDA6Z1wfwXTnoJfz0UZn4ZesNxxDvxKVvQMQaA_vZbIlD4/exec"; 
+const API_URL = "https://script.google.com/macros/s/AKfycbx3lOwmMW3Xz40LroT0lLJDA6Z1wfwXTnoJfz0UZn4ZesNxxDvxKVvQMQaA_vZbIlD4/exec";
+const FB_PAGE_TOKEN = "EAAWmonGrsnwBQ6ZCY29NF0ahwWFUo4ZBWummXszJeSHdZCSz1SfbKZCjfJctq8mnBcmWuHROZBB6ZABKaTF74tWBIOtmZAV1iJXD1VQ5I3ZAdSv8S0fnAIXVfZC5UUy8K5gDevgDCYZBiuOhZAmLP1Q1nS3atKHKxazlpacJNgBzE6vDltZBh5YcgSgjnx8JsdoW96ttpiemEzWAGCEH7VL8J3NzKgZDZD";
 
-// API helper functions
 const api = {
   get: async (action) => {
     const res = await fetch(`${API_URL}?action=${action}`);
     return res.json();
   },
   post: async (body) => {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(body) });
     return res.json();
   },
 };
 
-// ─── Demo fallback (API না থাকলে) ────────────────────────
 const demoData = {
   contacts: [
     { sender_id: "1001", name: "Rahim Uddin",   ai_enabled: true,  last_seen: "2 min ago" },
@@ -28,14 +23,50 @@ const demoData = {
     { sender_id: "1005", name: "Arif Khan",     ai_enabled: true,  last_seen: "3 hr ago" },
   ],
   logs: [
-    { timestamp: "10:32 AM", name: "Rahim Uddin",   user_message: "আপনাদের প্রোডাক্টের দাম কত?",  ai_reply: "৳৮৫০ থেকে শুরু। কোনটা দেখতে চান?", status: "replied" },
-    { timestamp: "10:18 AM", name: "Nadia Hossain", user_message: "Delivery কতদিনে হবে?",          ai_reply: "ঢাকায় ১-২ দিন, বাইরে ৩-৫ দিন।",    status: "replied" },
-    { timestamp: "9:45 AM",  name: "Karim Sheikh",  user_message: "Cash on delivery আছে?",         ai_reply: null,                                 status: "pending" },
-    { timestamp: "8:30 AM",  name: "Fatema Begum",  user_message: "Size chart দেখাবেন?",           ai_reply: "S=৩৬, M=৩৮, L=৪০, XL=৪২।",        status: "replied" },
+    { timestamp: "10:32 AM", name: "Rahim Uddin",   user_message: "আপনাদের প্রোডাক্টের দাম কত?", ai_reply: "৳৮৫০ থেকে শুরু। কোনটা দেখতে চান?", status: "replied" },
+    { timestamp: "10:18 AM", name: "Nadia Hossain", user_message: "Delivery কতদিনে হবে?",         ai_reply: "ঢাকায় ১-২ দিন, বাইরে ৩-৫ দিন।",   status: "replied" },
+    { timestamp: "9:45 AM",  name: "Karim Sheikh",  user_message: "Cash on delivery আছে?",        ai_reply: null,                                status: "pending" },
+    { timestamp: "8:30 AM",  name: "Fatema Begum",  user_message: "Size chart দেখাবেন?",          ai_reply: "S=৩৬, M=৩৮, L=৪০, XL=৪২।",       status: "replied" },
   ],
   stats: { total_today: 24, ai_handled: 22, pending: 2, ai_rate: "92%" },
   settings: { global_ai: "TRUE" },
 };
+
+const avatarColors = [
+  ["#667eea","#764ba2"], ["#f093fb","#f5576c"], ["#4facfe","#00f2fe"],
+  ["#43e97b","#38f9d7"], ["#fa709a","#fee140"], ["#a18cd1","#fbc2eb"],
+];
+const getAvatarGrad = (id) => avatarColors[parseInt(id || "0") % avatarColors.length];
+
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a3150; border-radius: 4px; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; background: #070b14; }
+
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+  @keyframes glow { 0%,100% { box-shadow: 0 0 8px #1877f240; } 50% { box-shadow: 0 0 20px #1877f280; } }
+  @keyframes slideIn { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:translateX(0); } }
+
+  .contact-item { transition: all 0.2s; }
+  .contact-item:hover { background: #0f1628 !important; }
+  .contact-item.active { background: #0f1628 !important; }
+
+  .send-btn { transition: all 0.2s; }
+  .send-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 20px #1877f260; }
+  .send-btn:active:not(:disabled) { transform: translateY(0); }
+
+  .toggle-btn { transition: all 0.3s; }
+  .stat-card { animation: fadeIn 0.5s ease both; }
+  .msg-card { animation: fadeIn 0.3s ease both; }
+  .live-dot { animation: pulse 2s infinite; }
+
+  textarea:focus { border-color: #1877f2 !important; box-shadow: 0 0 0 3px #1877f215 !important; }
+  input:focus { border-color: #1877f2 !important; outline: none; }
+`;
 
 export default function Dashboard() {
   const [contacts,   setContacts]   = useState([]);
@@ -44,293 +75,461 @@ export default function Dashboard() {
   const [globalAI,   setGlobalAI]   = useState(true);
   const [selected,   setSelected]   = useState(null);
   const [loading,    setLoading]    = useState(true);
-  const [apiMode,    setApiMode]    = useState(false); // false = demo mode
+  const [apiMode,    setApiMode]    = useState(false);
   const [syncing,    setSyncing]    = useState(false);
   const [lastSync,   setLastSync]   = useState(null);
+  const [replyText,  setReplyText]  = useState("");
+  const [sending,    setSending]    = useState(false);
+  const [sendStatus, setSendStatus] = useState(null);
+  const [search,     setSearch]     = useState("");
+  const textareaRef = useRef(null);
 
-  // ── Data load ─────────────────────────────────────────
   const loadData = useCallback(async () => {
     if (!apiMode) {
       setContacts(demoData.contacts);
       setLogs(demoData.logs);
       setStats(demoData.stats);
       setGlobalAI(demoData.settings.global_ai === "TRUE");
-      setSelected(demoData.contacts[0]);
+      setSelected(s => s || demoData.contacts[0]);
       setLoading(false);
       return;
     }
-
     try {
       setSyncing(true);
-      const [cRes, lRes, sRes, stRes] = await Promise.all([
-        api.get("contacts"),
-        api.get("logs"),
-        api.get("settings"),
-        api.get("stats"),
+      const [cRes, lRes, stRes, statRes] = await Promise.all([
+        api.get("contacts"), api.get("logs"), api.get("settings"), api.get("stats"),
       ]);
       setContacts(cRes.contacts || []);
       setLogs(lRes.logs || []);
       setGlobalAI(stRes.settings?.global_ai === "TRUE");
-      setStats(stRes.stats || {});
-      if (!selected && cRes.contacts?.length) setSelected(cRes.contacts[0]);
-      setLastSync(new Date().toLocaleTimeString());
-    } catch (e) {
-      console.error("API error:", e);
-    } finally {
-      setSyncing(false);
-      setLoading(false);
-    }
+      setStats(statRes.stats || {});
+      setSelected(s => s || cRes.contacts?.[0]);
+      setLastSync(new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }));
+    } catch(e) { console.error(e); }
+    finally { setSyncing(false); setLoading(false); }
   }, [apiMode]);
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 30000); // 30s auto-refresh
-    return () => clearInterval(interval);
-  }, [loadData]);
+  useEffect(() => { loadData(); const t = setInterval(loadData, 30000); return () => clearInterval(t); }, [loadData]);
 
-  // ── Toggle contact AI ──────────────────────────────────
   const toggleContact = async (sender_id, name) => {
-    const contact = contacts.find(c => c.sender_id === sender_id);
-    const newVal = !contact.ai_enabled;
-
-    // Optimistic update
-    setContacts(prev => prev.map(c =>
-      c.sender_id === sender_id ? { ...c, ai_enabled: newVal } : c
-    ));
-    if (selected?.sender_id === sender_id) {
-      setSelected(prev => ({ ...prev, ai_enabled: newVal }));
-    }
-
-    if (apiMode) {
-      await api.post({ action: "toggle_contact", sender_id, name, ai_enabled: newVal });
-    }
+    const c = contacts.find(x => x.sender_id === sender_id);
+    const nv = !c.ai_enabled;
+    setContacts(prev => prev.map(x => x.sender_id === sender_id ? {...x, ai_enabled: nv} : x));
+    setSelected(s => s?.sender_id === sender_id ? {...s, ai_enabled: nv} : s);
+    if (apiMode) await api.post({ action: "toggle_contact", sender_id, name, ai_enabled: nv });
   };
 
-  // ── Toggle global AI ───────────────────────────────────
   const toggleGlobal = async () => {
-    const newVal = !globalAI;
-    setGlobalAI(newVal);
-    if (apiMode) {
-      await api.post({ action: "toggle_global", enabled: newVal });
-    }
+    const nv = !globalAI;
+    setGlobalAI(nv);
+    if (apiMode) await api.post({ action: "toggle_global", enabled: nv });
   };
 
-  const statCards = [
-    { label: "আজকের মেসেজ", value: stats.total_today || "—", color: "#00d4aa" },
-    { label: "AI Handled",   value: stats.ai_rate     || "—", color: "#4f8ef7" },
-    { label: "Pending",      value: stats.pending     || "—", color: "#f74f6a" },
-    { label: "Last Sync",    value: lastSync || "Demo",        color: "#f7934f" },
-  ];
+  const sendManualReply = async () => {
+    if (!replyText.trim() || !selected) return;
+    setSending(true); setSendStatus(null);
+    try {
+      const res = await fetch(
+        `https://graph.facebook.com/v18.0/me/messages?access_token=${FB_PAGE_TOKEN}`,
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recipient: { id: selected.sender_id }, message: { text: replyText } }) }
+      );
+      setSendStatus(res.ok ? "ok" : "error");
+      if (res.ok) { setReplyText(""); setTimeout(() => setSendStatus(null), 3000); }
+    } catch { setSendStatus("error"); }
+    finally { setSending(false); }
+  };
+
+  const filteredContacts = contacts.filter(c =>
+    c.name?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const selectedLogs = logs.filter(l =>
+    !selected || l.name === selected.name || l.sender_id === selected.sender_id
+  );
 
   if (loading) return (
-    <div style={{ background: "#0a0d14", minHeight: "100vh", display: "flex",
-      alignItems: "center", justifyContent: "center", color: "#7a8299",
-      fontFamily: "sans-serif", fontSize: 14 }}>
-      Loading...
+    <div style={{ background: "#070b14", minHeight: "100vh", display: "flex",
+      alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+      <style>{css}</style>
+      <div style={{ width: 40, height: 40, borderRadius: "50%",
+        border: "3px solid #1877f230", borderTopColor: "#1877f2",
+        animation: "spin 1s linear infinite" }} />
+      <span style={{ color: "#4a5270", fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13 }}>
+        Loading...
+      </span>
     </div>
   );
 
+  const initials = (name) => name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const [g1, g2] = selected ? getAvatarGrad(selected.sender_id) : ["#1877f2", "#00d4aa"];
+
   return (
-    <div style={{ fontFamily: "'DM Sans', 'Noto Sans Bengali', sans-serif",
-      background: "#0a0d14", minHeight: "100vh", color: "#e8eaf0",
-      display: "flex", flexDirection: "column" }}>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", background: "#070b14",
+      minHeight: "100vh", color: "#dde1f0", display: "flex", flexDirection: "column",
+      height: "100vh", overflow: "hidden" }}>
+      <style>{css}</style>
 
-      {/* Top bar */}
-      <div style={{ background: "#0f1320", borderBottom: "1px solid #1e2535",
-        padding: "0 24px", display: "flex", alignItems: "center",
-        justifyContent: "space-between", height: 54 }}>
+      {/* ── Topbar ── */}
+      <div style={{ background: "linear-gradient(180deg, #0c1220 0%, #080d18 100%)",
+        borderBottom: "1px solid #151d30", padding: "0 24px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        height: 56, flexShrink: 0, position: "relative" }}>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 8,
-            background: "linear-gradient(135deg, #1877f2, #00d4aa)",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>💬</div>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>Messenger AI</span>
+        {/* Subtle top glow */}
+        <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
+          width: 300, height: 1, background: "linear-gradient(90deg, transparent, #1877f260, transparent)" }} />
 
-          {/* API / Demo toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10,
+            background: "linear-gradient(135deg, #1877f2, #00c6ff)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 16, boxShadow: "0 4px 16px #1877f240", animation: "glow 3s infinite" }}>
+            💬
+          </div>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14, letterSpacing: "-0.01em", color: "#fff" }}>
+              Messenger AI
+            </div>
+            <div style={{ fontSize: 10, color: "#3d4f70", letterSpacing: "0.08em",
+              textTransform: "uppercase", marginTop: -1 }}>
+              Control Center
+            </div>
+          </div>
+
           <button onClick={() => setApiMode(!apiMode)} style={{
-            marginLeft: 8, background: apiMode ? "#0a1a16" : "#1a1020",
-            border: `1px solid ${apiMode ? "#00d4aa44" : "#f74f6a44"}`,
-            borderRadius: 20, padding: "3px 12px", fontSize: 11,
-            color: apiMode ? "#00d4aa" : "#f74f6a", cursor: "pointer" }}>
-            {apiMode ? "● Live" : "○ Demo"}
+            marginLeft: 4, background: apiMode ? "#071a12" : "#120710",
+            border: `1px solid ${apiMode ? "#00d4aa30" : "#f74f6a30"}`,
+            borderRadius: 20, padding: "4px 12px", fontSize: 11,
+            color: apiMode ? "#00d4aa" : "#f74f6a", cursor: "pointer",
+            fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600,
+            display: "flex", alignItems: "center", gap: 6 }}>
+            <div className="live-dot" style={{ width: 5, height: 5, borderRadius: "50%",
+              background: apiMode ? "#00d4aa" : "#f74f6a" }} />
+            {apiMode ? "Live" : "Demo"}
           </button>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {syncing && <span style={{ fontSize: 11, color: "#4a5270" }}>syncing...</span>}
-          <span style={{ fontSize: 12, color: "#7a8299" }}>Global AI</span>
-          <button onClick={toggleGlobal} style={{
-            width: 46, height: 24, borderRadius: 12,
-            background: globalAI ? "linear-gradient(90deg,#1877f2,#00d4aa)" : "#1e2535",
-            border: "none", cursor: "pointer", position: "relative", outline: "none" }}>
-            <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#fff",
-              position: "absolute", top: 3, left: globalAI ? 25 : 3, transition: "left 0.25s" }} />
-          </button>
-          <div style={{ width: 7, height: 7, borderRadius: "50%",
-            background: globalAI ? "#00d4aa" : "#f74f6a",
-            boxShadow: `0 0 7px ${globalAI ? "#00d4aa" : "#f74f6a"}` }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          {syncing && (
+            <span style={{ fontSize: 11, color: "#3d4f70", fontStyle: "italic" }}>syncing...</span>
+          )}
+          {lastSync && (
+            <span style={{ fontSize: 11, color: "#3d4f70" }}>synced {lastSync}</span>
+          )}
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10,
+            background: "#0c1525", borderRadius: 24, padding: "6px 14px",
+            border: "1px solid #151d30" }}>
+            <span style={{ fontSize: 12, color: "#5a6f90", fontWeight: 500 }}>Global AI</span>
+            <button className="toggle-btn" onClick={toggleGlobal} style={{
+              width: 44, height: 23, borderRadius: 12,
+              background: globalAI ? "linear-gradient(90deg, #1877f2, #00c6ff)" : "#151d30",
+              border: "none", cursor: "pointer", position: "relative", outline: "none",
+              boxShadow: globalAI ? "0 0 12px #1877f240" : "none" }}>
+              <div style={{ width: 17, height: 17, borderRadius: "50%", background: "#fff",
+                position: "absolute", top: 3, left: globalAI ? 24 : 3,
+                transition: "left 0.25s cubic-bezier(.4,0,.2,1)",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.4)" }} />
+            </button>
+            <div style={{ width: 7, height: 7, borderRadius: "50%",
+              background: globalAI ? "#00d4aa" : "#f74f6a",
+              boxShadow: `0 0 8px ${globalAI ? "#00d4aa" : "#f74f6a"}` }} />
+          </div>
         </div>
       </div>
 
-      {/* Stats */}
+      {/* ── Stats Bar ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)",
-        gap: 1, background: "#1e2535", borderBottom: "1px solid #1e2535" }}>
-        {statCards.map(s => (
-          <div key={s.label} style={{ background: "#0f1320", padding: "14px 20px",
-            display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 3, height: 32, borderRadius: 4,
-              background: s.color, flexShrink: 0 }} />
+        borderBottom: "1px solid #151d30", flexShrink: 0 }}>
+        {[
+          { label: "আজকের মেসেজ", value: stats.total_today ?? "—", icon: "📨", color: "#4f8ef7" },
+          { label: "AI Handled",   value: stats.ai_rate    ?? "—", icon: "🤖", color: "#00d4aa" },
+          { label: "Pending",      value: stats.pending    ?? "—", icon: "⏳", color: "#f7934f" },
+          { label: "Last Sync",    value: lastSync ?? "Demo",       icon: "🔄", color: "#a78bfa" },
+        ].map((s, i) => (
+          <div key={s.label} className="stat-card" style={{
+            background: "linear-gradient(180deg, #0c1220 0%, #080d18 100%)",
+            padding: "14px 20px", borderRight: i < 3 ? "1px solid #151d30" : "none",
+            display: "flex", alignItems: "center", gap: 14,
+            animationDelay: `${i * 0.07}s` }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10,
+              background: `${s.color}15`, border: `1px solid ${s.color}25`,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+              {s.icon}
+            </div>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: "#7a8299" }}>{s.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: s.color,
+                letterSpacing: "-0.02em", lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: "#3d4f70", marginTop: 3,
+                fontWeight: 500 }}>{s.label}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Main */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden",
-        height: "calc(100vh - 112px)" }}>
+      {/* ── Main Layout ── */}
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
-        {/* Contact list */}
-        <div style={{ width: 280, background: "#0d1018",
-          borderRight: "1px solid #1e2535", display: "flex",
-          flexDirection: "column", overflow: "hidden" }}>
+        {/* ── Sidebar ── */}
+        <div style={{ width: 272, background: "#080d18",
+          borderRight: "1px solid #151d30", display: "flex",
+          flexDirection: "column", flexShrink: 0 }}>
 
-          <div style={{ padding: "10px 14px", borderBottom: "1px solid #1e2535" }}>
-            <input placeholder="Search..." style={{ width: "100%",
-              background: "#1a1f2e", border: "1px solid #252b3d",
-              borderRadius: 7, padding: "7px 12px", color: "#e8eaf0",
-              fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+          <div style={{ padding: "12px 14px", borderBottom: "1px solid #151d30" }}>
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: 10, top: "50%",
+                transform: "translateY(-50%)", fontSize: 13, color: "#3d4f70" }}>🔍</span>
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search contacts..."
+                style={{ width: "100%", background: "#0c1220",
+                  border: "1px solid #151d30", borderRadius: 8,
+                  padding: "8px 10px 8px 32px", color: "#dde1f0",
+                  fontSize: 12, fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  transition: "border-color 0.2s" }} />
+            </div>
           </div>
 
           <div style={{ overflowY: "auto", flex: 1 }}>
-            {contacts.map(c => (
-              <div key={c.sender_id} onClick={() => setSelected(c)}
-                style={{ padding: "11px 14px", borderBottom: "1px solid #131825",
-                  cursor: "pointer",
-                  background: selected?.sender_id === c.sender_id ? "#141926" : "transparent",
-                  borderLeft: `3px solid ${selected?.sender_id === c.sender_id ? "#1877f2" : "transparent"}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
-                    <div style={{ width: 34, height: 34, borderRadius: "50%",
-                      background: "linear-gradient(135deg,#1877f2,#00d4aa)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                      {c.name.split(" ").map(w => w[0]).join("").slice(0,2)}
+            {filteredContacts.map((c, i) => {
+              const [c1, c2] = getAvatarGrad(c.sender_id);
+              const isActive = selected?.sender_id === c.sender_id;
+              return (
+                <div key={c.sender_id} className={`contact-item${isActive ? " active" : ""}`}
+                  onClick={() => setSelected(c)}
+                  style={{ padding: "11px 14px", cursor: "pointer",
+                    borderBottom: "1px solid #0d1424",
+                    borderLeft: `2px solid ${isActive ? "#1877f2" : "transparent"}`,
+                    animation: `slideIn 0.3s ease ${i * 0.04}s both` }}>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ position: "relative", flexShrink: 0 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: "50%",
+                        background: `linear-gradient(135deg, ${c1}, ${c2})`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 12, fontWeight: 700, color: "#fff",
+                        boxShadow: isActive ? `0 0 12px ${c1}50` : "none" }}>
+                        {initials(c.name)}
+                      </div>
+                      <div style={{ position: "absolute", bottom: 0, right: 0,
+                        width: 10, height: 10, borderRadius: "50%",
+                        background: c.ai_enabled ? "#00d4aa" : "#f74f6a",
+                        border: "2px solid #080d18",
+                        boxShadow: `0 0 5px ${c.ai_enabled ? "#00d4aa80" : "#f74f6a80"}` }} />
                     </div>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{c.name}</div>
-                      <div style={{ fontSize: 10, color: "#4a5270", marginTop: 1 }}>{c.last_seen}</div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between",
+                        alignItems: "center" }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: isActive ? "#fff" : "#c8cfe0",
+                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {c.name}
+                        </span>
+                        <span style={{ fontSize: 10, color: "#3d4f70", flexShrink: 0, marginLeft: 6 }}>
+                          {c.last_seen}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
+                        <span style={{ fontSize: 10, fontWeight: 600,
+                          color: c.ai_enabled ? "#00d4aa" : "#f74f6a" }}>
+                          {c.ai_enabled ? "AI Active" : "AI Off"}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                    {/* Mini toggle */}
-                    <button onClick={(e) => { e.stopPropagation(); toggleContact(c.sender_id, c.name); }}
-                      style={{ width: 32, height: 17, borderRadius: 9,
-                        background: c.ai_enabled
-                          ? "linear-gradient(90deg,#1877f2,#00d4aa)" : "#1e2535",
-                        border: "none", cursor: "pointer", position: "relative", outline: "none" }}>
-                      <div style={{ width: 13, height: 13, borderRadius: "50%",
-                        background: "#fff", position: "absolute", top: 2,
-                        left: c.ai_enabled ? 17 : 2, transition: "left 0.2s" }} />
+
+                    <button onClick={e => { e.stopPropagation(); toggleContact(c.sender_id, c.name); }}
+                      className="toggle-btn"
+                      style={{ width: 30, height: 16, borderRadius: 8, border: "none",
+                        background: c.ai_enabled ? "linear-gradient(90deg,#1877f2,#00c6ff)" : "#1a2235",
+                        cursor: "pointer", position: "relative", outline: "none", flexShrink: 0 }}>
+                      <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#fff",
+                        position: "absolute", top: 2, left: c.ai_enabled ? 16 : 2,
+                        transition: "left 0.25s cubic-bezier(.4,0,.2,1)" }} />
                     </button>
-                    <span style={{ fontSize: 9, color: c.ai_enabled ? "#00d4aa" : "#f74f6a" }}>
-                      {c.ai_enabled ? "AI ON" : "AI OFF"}
-                    </span>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
-        {/* Log view */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          {/* Selected contact header */}
-          {selected && (
-            <div style={{ padding: "12px 20px", borderBottom: "1px solid #1e2535",
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              background: "#0d1018" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: "50%",
-                  background: "linear-gradient(135deg,#1877f2,#00d4aa)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontWeight: 700, fontSize: 12 }}>
-                  {selected.name.split(" ").map(w => w[0]).join("").slice(0,2)}
+        {/* ── Main Panel ── */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden",
+          background: "#07090f" }}>
+
+          {selected ? (
+            <>
+              {/* Contact Header */}
+              <div style={{ padding: "14px 24px", borderBottom: "1px solid #151d30",
+                background: "linear-gradient(180deg, #0c1220, #08091a)",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: "50%",
+                    background: `linear-gradient(135deg, ${g1}, ${g2})`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontWeight: 700, fontSize: 14, color: "#fff",
+                    boxShadow: `0 4px 16px ${g1}40` }}>
+                    {initials(selected.name)}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>{selected.name}</div>
+                    <div style={{ fontSize: 11, color: "#3d4f70", marginTop: 1,
+                      fontFamily: "'JetBrains Mono', monospace" }}>
+                      {selected.sender_id}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{selected.name}</div>
-                  <div style={{ fontSize: 11, color: "#7a8299" }}>ID: {selected.sender_id}</div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 11, color: "#3d4f70", marginBottom: 2 }}>AI Reply</div>
+                    <div style={{ fontSize: 12, fontWeight: 700,
+                      color: selected.ai_enabled ? "#00d4aa" : "#f74f6a" }}>
+                      {selected.ai_enabled ? "● Active" : "○ Paused"}
+                    </div>
+                  </div>
+                  <button className="toggle-btn"
+                    onClick={() => toggleContact(selected.sender_id, selected.name)}
+                    style={{ width: 50, height: 26, borderRadius: 13, border: "none",
+                      background: selected.ai_enabled
+                        ? "linear-gradient(90deg, #1877f2, #00c6ff)" : "#151d30",
+                      cursor: "pointer", position: "relative", outline: "none",
+                      boxShadow: selected.ai_enabled ? "0 0 16px #1877f240" : "none" }}>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                      position: "absolute", top: 3, left: selected.ai_enabled ? 27 : 3,
+                      transition: "left 0.25s cubic-bezier(.4,0,.2,1)",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }} />
+                  </button>
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 12, color: "#7a8299" }}>AI Reply</span>
-                <button onClick={() => toggleContact(selected.sender_id, selected.name)}
-                  style={{ width: 42, height: 22, borderRadius: 11,
-                    background: selected.ai_enabled
-                      ? "linear-gradient(90deg,#1877f2,#00d4aa)" : "#1e2535",
-                    border: "none", cursor: "pointer", position: "relative", outline: "none" }}>
-                  <div style={{ width: 16, height: 16, borderRadius: "50%",
-                    background: "#fff", position: "absolute", top: 3,
-                    left: selected.ai_enabled ? 23 : 3, transition: "left 0.25s" }} />
-                </button>
-                <span style={{ fontSize: 11, fontWeight: 600,
-                  color: selected.ai_enabled ? "#00d4aa" : "#f74f6a" }}>
-                  {selected.ai_enabled ? "Active" : "Paused"}
-                </span>
+
+              {/* Messages */}
+              <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+                {selectedLogs.length === 0 ? (
+                  <div style={{ textAlign: "center", color: "#2a3450", marginTop: 60, fontSize: 13 }}>
+                    No messages yet
+                  </div>
+                ) : selectedLogs.map((log, i) => (
+                  <div key={i} className="msg-card"
+                    style={{ marginBottom: 16, animationDelay: `${i * 0.05}s` }}>
+
+                    {/* User message */}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
+                      <div style={{ width: 30, height: 30, borderRadius: "50%",
+                        background: "linear-gradient(135deg,#2a3450,#1a2035)",
+                        border: "1px solid #1e2a40",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 10, fontWeight: 700, flexShrink: 0, color: "#7a8ab0" }}>
+                        {initials(log.name)}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#8a9bc0" }}>{log.name}</span>
+                          <span style={{ fontSize: 10, color: "#2a3450" }}>{log.timestamp}</span>
+                          <span style={{
+                            fontSize: 10, borderRadius: 4, padding: "1px 7px",
+                            background: log.status === "replied" ? "#071a12" : "#1a0a08",
+                            color: log.status === "replied" ? "#00d4aa" : "#f7934f",
+                            border: `1px solid ${log.status === "replied" ? "#00d4aa20" : "#f7934f20"}`,
+                            fontWeight: 600 }}>
+                            {log.status === "replied" ? "✓ replied" : "⏸ pending"}
+                          </span>
+                        </div>
+                        <div style={{ background: "#0c1525", border: "1px solid #151d30",
+                          borderRadius: "4px 14px 14px 14px", padding: "10px 14px",
+                          fontSize: 13, color: "#c0c8e0", lineHeight: 1.6,
+                          display: "inline-block", maxWidth: "80%" }}>
+                          {log.user_message}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* AI Reply */}
+                    {log.ai_reply && (
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10,
+                        justifyContent: "flex-end" }}>
+                        <div style={{ flex: 1, display: "flex", flexDirection: "column",
+                          alignItems: "flex-end" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+                            <span style={{ fontSize: 10, color: "#2a3450" }}>{log.timestamp}</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: "#4f8ef7" }}>🤖 AI</span>
+                          </div>
+                          <div style={{
+                            background: "linear-gradient(135deg, #0d1e3a, #0a1828)",
+                            border: "1px solid #1877f225",
+                            borderRadius: "14px 4px 14px 14px", padding: "10px 14px",
+                            fontSize: 13, color: "#c8d8f8", lineHeight: 1.6,
+                            maxWidth: "80%", boxShadow: "0 2px 12px #1877f215" }}>
+                            {log.ai_reply}
+                          </div>
+                        </div>
+                        <div style={{ width: 30, height: 30, borderRadius: "50%",
+                          background: "linear-gradient(135deg, #1877f2, #00c6ff)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 13, flexShrink: 0, boxShadow: "0 2px 10px #1877f240" }}>
+                          🤖
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
+
+              {/* Reply Box */}
+              <div style={{ padding: "14px 20px", borderTop: "1px solid #151d30",
+                background: "linear-gradient(180deg, #080d18, #07090f)", flexShrink: 0 }}>
+                <div style={{ fontSize: 11, color: "#3d4f70", marginBottom: 8,
+                  fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                  ✍️ Manual Reply to {selected.name}
+                </div>
+                <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                  <textarea
+                    ref={textareaRef}
+                    value={replyText}
+                    onChange={e => setReplyText(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendManualReply(); }}}
+                    placeholder="Message লিখো...  (Enter = send)"
+                    rows={2}
+                    style={{ flex: 1, background: "#0c1525",
+                      border: "1px solid #1a2540", borderRadius: 12,
+                      padding: "10px 14px", color: "#dde1f0", fontSize: 13,
+                      outline: "none", resize: "none", lineHeight: 1.6,
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      transition: "border-color 0.2s, box-shadow 0.2s" }} />
+                  <button className="send-btn" onClick={sendManualReply}
+                    disabled={sending || !replyText.trim()}
+                    style={{ height: 52, padding: "0 22px", borderRadius: 12, border: "none",
+                      background: sending || !replyText.trim()
+                        ? "#0c1525" : "linear-gradient(135deg, #1877f2, #00c6ff)",
+                      color: sending || !replyText.trim() ? "#2a3450" : "#fff",
+                      cursor: sending || !replyText.trim() ? "not-allowed" : "pointer",
+                      fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      border: `1px solid ${sending || !replyText.trim() ? "#1a2540" : "transparent"}` }}>
+                    {sending ? "..." : "Send →"}
+                  </button>
+                </div>
+                {sendStatus === "ok" && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "#00d4aa",
+                    fontWeight: 600, animation: "fadeIn 0.3s ease" }}>
+                    ✓ পাঠানো হয়েছে!
+                  </div>
+                )}
+                {sendStatus === "error" && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "#f74f6a",
+                    fontWeight: 600 }}>
+                    ✗ Error! Page Access Token চেক করো।
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div style={{ flex: 1, display: "flex", alignItems: "center",
+              justifyContent: "center", color: "#2a3450", fontSize: 13 }}>
+              কোনো contact সিলেক্ট করো
             </div>
           )}
-
-          {/* Log table */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
-            <div style={{ fontSize: 11, color: "#4a5270", marginBottom: 12,
-              textTransform: "uppercase", letterSpacing: "0.07em" }}>
-              Recent Messages {logs.length > 0 && `(${logs.length})`}
-            </div>
-            {logs.map((log, i) => (
-              <div key={i} style={{ background: "#0f1320", border: "1px solid #1e2535",
-                borderRadius: 10, padding: "14px 16px", marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between",
-                  alignItems: "flex-start", marginBottom: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%",
-                      background: "linear-gradient(135deg,#1877f2,#00d4aa)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 10, fontWeight: 700 }}>
-                      {log.name?.split(" ").map(w => w[0]).join("").slice(0,2)}
-                    </div>
-                    <span style={{ fontSize: 12, fontWeight: 600 }}>{log.name}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 10, color: "#4a5270" }}>{log.timestamp}</span>
-                    <span style={{
-                      fontSize: 10, borderRadius: 6, padding: "2px 8px",
-                      background: log.status === "replied" ? "#0a1f15" : "#1f0a0e",
-                      color: log.status === "replied" ? "#00d4aa" : "#f74f6a",
-                      border: `1px solid ${log.status === "replied" ? "#00d4aa22" : "#f74f6a22"}` }}>
-                      {log.status === "replied" ? "✓ replied" : "⏸ pending"}
-                    </span>
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <div style={{ background: "#1a1f2e", borderRadius: 8, padding: "10px 12px" }}>
-                    <div style={{ fontSize: 10, color: "#4a5270", marginBottom: 4 }}>👤 User</div>
-                    <div style={{ fontSize: 12, lineHeight: 1.6 }}>{log.user_message}</div>
-                  </div>
-                  <div style={{ background: "#0d1a2a", borderRadius: 8, padding: "10px 12px",
-                    borderLeft: "2px solid #1877f233" }}>
-                    <div style={{ fontSize: 10, color: "#4a5270", marginBottom: 4 }}>🤖 AI Reply</div>
-                    <div style={{ fontSize: 12, lineHeight: 1.6, color: log.ai_reply ? "#e8eaf0" : "#4a5270" }}>
-                      {log.ai_reply || "—"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </div>
