@@ -531,14 +531,14 @@ export default function Dashboard() {
                       transition: "border-color 0.2s, box-shadow 0.2s" }} />
                   <button className="send-btn" onClick={sendManualReply}
                     disabled={sending || !replyText.trim()}
-                    style={{ height: 52, padding: "0 22px", borderRadius: 12, border: "none",
+                    style={{ height: 52, padding: "0 22px", borderRadius: 12,
+                      border: `1px solid ${sending || !replyText.trim() ? "#1a2540" : "transparent"}`,
                       background: sending || !replyText.trim()
                         ? "#0c1525" : "linear-gradient(135deg, #1877f2, #00c6ff)",
                       color: sending || !replyText.trim() ? "#2a3450" : "#fff",
                       cursor: sending || !replyText.trim() ? "not-allowed" : "pointer",
                       fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
-                      fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      border: `1px solid ${sending || !replyText.trim() ? "#1a2540" : "transparent"}` }}>
+                      fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {sending ? "..." : "Send →"}
                   </button>
                 </div>
