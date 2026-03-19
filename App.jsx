@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 // ⬇️ এখানে তোমার Google Apps Script deploy URL দাও
-const API_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbx3lOwmMW3Xz40LroT0lLJDA6Z1wfwXTnoJfz0UZn4ZesNxxDvxKVvQMQaA_vZbIlD4/exec"; 
 
 // API helper functions
 const api = {
