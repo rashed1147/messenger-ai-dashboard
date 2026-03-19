@@ -165,11 +165,6 @@ export default function Dashboard() {
     finally { setSending(false); }
   };
 
-  // Auto scroll to bottom
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [selectedLogs?.length]);
-
   const filteredContacts = contacts.filter(c =>
     c.name?.toLowerCase().includes(search.toLowerCase())
   );
@@ -178,6 +173,11 @@ export default function Dashboard() {
     .filter(l => !selected || l.name === selected.name || l.sender_id === selected.sender_id)
     .slice()
     .reverse();
+
+  // Auto scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [selectedLogs.length]);
 
   if (loading) return (
     <div style={{ background: "#070b14", minHeight: "100vh", display: "flex",
