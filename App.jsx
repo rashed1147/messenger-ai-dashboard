@@ -83,6 +83,7 @@ export default function Dashboard() {
   const [sendStatus, setSendStatus] = useState(null);
   const [search,     setSearch]     = useState("");
   const textareaRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   const loadData = useCallback(async () => {
     if (!apiMode) {
@@ -127,26 +128,56 @@ export default function Dashboard() {
 
   const sendManualReply = async () => {
     if (!replyText.trim() || !selected) return;
+    const msgText = replyText;
     setSending(true); setSendStatus(null);
+
+    // Optimistically add to UI immediately
+    const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const newEntry = {
+      timestamp: now,
+      name: selected.name,
+      sender_id: selected.sender_id,
+      user_message: "— (manual reply sent)",
+      ai_reply: msgText,
+      status: "manual",
+    };
+    setLogs(prev => [newEntry, ...prev]);
+    setReplyText("");
+
     try {
       const res = await fetch(
         `https://graph.facebook.com/v18.0/me/messages?access_token=${FB_PAGE_TOKEN}`,
         { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recipient: { id: selected.sender_id }, message: { text: replyText } }) }
+          body: JSON.stringify({ recipient: { id: selected.sender_id }, message: { text: msgText } }) }
       );
       setSendStatus(res.ok ? "ok" : "error");
-      if (res.ok) { setReplyText(""); setTimeout(() => setSendStatus(null), 3000); }
-    } catch { setSendStatus("error"); }
+      if (!res.ok) {
+        // Remove optimistic entry on failure
+        setLogs(prev => prev.filter(l => l !== newEntry));
+        setReplyText(msgText);
+      }
+      setTimeout(() => setSendStatus(null), 3000);
+    } catch {
+      setSendStatus("error");
+      setLogs(prev => prev.filter(l => l !== newEntry));
+      setReplyText(msgText);
+    }
     finally { setSending(false); }
   };
+
+  // Auto scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [selectedLogs?.length]);
 
   const filteredContacts = contacts.filter(c =>
     c.name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const selectedLogs = logs.filter(l =>
-    !selected || l.name === selected.name || l.sender_id === selected.sender_id
-  );
+  const selectedLogs = logs
+    .filter(l => !selected || l.name === selected.name || l.sender_id === selected.sender_id)
+    .slice()
+    .reverse();
 
   if (loading) return (
     <div style={{ background: "#070b14", minHeight: "100vh", display: "flex",
@@ -429,11 +460,11 @@ export default function Dashboard() {
                           <span style={{ fontSize: 10, color: "#2a3450" }}>{log.timestamp}</span>
                           <span style={{
                             fontSize: 10, borderRadius: 4, padding: "1px 7px",
-                            background: log.status === "replied" ? "#071a12" : "#1a0a08",
-                            color: log.status === "replied" ? "#00d4aa" : "#f7934f",
-                            border: `1px solid ${log.status === "replied" ? "#00d4aa20" : "#f7934f20"}`,
+                            background: log.status === "replied" ? "#071a12" : log.status === "manual" ? "#0a0e1a" : "#1a0a08",
+                            color: log.status === "replied" ? "#00d4aa" : log.status === "manual" ? "#4f8ef7" : "#f7934f",
+                            border: `1px solid ${log.status === "replied" ? "#00d4aa20" : log.status === "manual" ? "#4f8ef720" : "#f7934f20"}`,
                             fontWeight: 600 }}>
-                            {log.status === "replied" ? "✓ replied" : "⏸ pending"}
+                            {log.status === "replied" ? "✓ replied" : log.status === "manual" ? "✍ manual" : "⏸ pending"}
                           </span>
                         </div>
                         <div style={{ background: "#0c1525", border: "1px solid #151d30",
@@ -474,6 +505,7 @@ export default function Dashboard() {
                     )}
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Reply Box */}
