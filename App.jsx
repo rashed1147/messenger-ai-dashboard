@@ -241,6 +241,24 @@ export default function App() {
 
   useEffect(() => { loadData(); const t=setInterval(loadData,30000); return ()=>clearInterval(t); }, [loadData]);
 
+  const formatTime = (t) => {
+    if (!t) return "";
+    // If it's an ISO date string, convert to relative time
+    if (t.includes("T") || t.includes("-")) {
+      try {
+        const diff = Date.now() - new Date(t).getTime();
+        const m = Math.floor(diff/60000);
+        if (m < 1) return "just now";
+        if (m < 60) return m + "m";
+        const h = Math.floor(m/60);
+        if (h < 24) return h + "h";
+        return Math.floor(h/24) + "d";
+      } catch { return t; }
+    }
+    // Already short like "2 min ago" -> "2m"
+    return t.replace(" min ago","m").replace(" hr ago","h").replace(" days ago","d").replace(" ago","");
+  };
+
   const filteredContacts = contacts.filter(c=>c.name?.toLowerCase().includes(search.toLowerCase()));
   const selectedLogs = logs
     .filter(l=>!selected||l.name===selected.name||l.sender_id===selected.sender_id)
@@ -392,7 +410,7 @@ export default function App() {
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
                     <span style={{fontSize:15,fontWeight:700,color:"#fff",overflow:"hidden",
                       textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</span>
-                    <span style={{fontSize:11,color:"#2a3860",flexShrink:0,marginLeft:8}}>{c.last_seen}</span>
+                    <span style={{fontSize:10,color:"#2a3860",flexShrink:0,marginLeft:4,whiteSpace:"nowrap"}}>{c.last_seen?.replace(" ago","")}</span>
                   </div>
                   <div style={{fontSize:12,color:"#4a5f80",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                     {lastMsg?(lastMsg.ai_reply?`🤖 ${lastMsg.ai_reply}`:`👤 ${lastMsg.user_message}`):"No messages yet"}
